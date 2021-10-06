@@ -16,14 +16,14 @@ def read_file(file_name):
     f.close()
     return n_jobs, n_machines, operations
 
-def evaluate_makespan(individual,n_jobs,n_machines):
+def evaluate_makespan(particle,n_jobs,n_machines):
     # each machine has a end time
     machine_time = [0 for _ in range(n_machines)]
 
     # more recent end time of the job
     job_time = [0 for _ in range(n_jobs)]
 
-    for operation in individual:
+    for operation in particle:
         job,machine,time = operation
 
         max_time = max(machine_time[machine],job_time[job-1])
@@ -47,7 +47,7 @@ def create_particle(n_jobs,n_machines,operations):
         start = stop
         stop += n_machines 
 
-    individual = []
+    particle = []
     for _ in range(n_jobs*n_machines):
         first_operations = [(sequence[0],idx) for idx,sequence in enumerate(sequences) if len(sequence)>0]
         operation = random.choice(first_operations)
@@ -55,9 +55,9 @@ def create_particle(n_jobs,n_machines,operations):
         idx = operation[1]
         sequences[idx].remove(operation[0])
         
-        individual.append(operation[0])
+        particle.append(operation[0])
     
-    return individual
+    return particle
 
 def generate_swarm(swarm_size, n_jobs, n_machines, operations):
     swarm = []
@@ -86,34 +86,82 @@ def find_best(swarm,particle_best,particle_makespan,n_jobs,n_machines):
     
     return global_best
 
-def update_position():
-    pass
+def insert_position(operations,position):
+    for idx,operation in enumerate(operations):
+        
+        if operation not in position:
+            position.append(operation)
+            break
+        
+    return operations[idx+1:]
 
-def execute(swarm,wc,wb,wg,n_jobs,n_machines):
+def update_position(wc,wb,n,swarm,particle_best,global_best,idx):
+    new_position = []
+
+    # copys of particles because of the pop function use
+    aux_swarm = copy.deepcopy(swarm[idx])
+    aux_part_best = copy.deepcopy(particle_best[idx])
+    aux_glob_best = copy.deepcopy(global_best)
+
+    for _ in range(n):
+        u = random.random()
+        u = round(u,2)
+
+        # position from current position
+        if u <= wc:
+            aux_swarm = insert_position(aux_swarm,new_position)
+
+        # position from best particle position
+        elif u > wc and u <= wc+wb:
+            aux_part_best = insert_position(aux_part_best,new_position)
+
+        # position from best global position
+        else:
+            aux_glob_best = insert_position(aux_glob_best,new_position)
+    
+    return new_position
+
+def execute(swarm,wc,wb,n_jobs,n_machines,iterations=100):
+    swarm_size = len(swarm)
+    
     # the start position for each particle is the best position
     particle_best = copy.deepcopy(swarm)
 
-    # criterio de parada (depois colocar como parametro vindo main)
-    iteracoes = 3
-    
-    # makespan of each particle best position
-    particle_makespan = [evaluate_makespan(p,n_jobs,n_machines) for p in particle_best]
-    
-    global_best = find_best(swarm,particle_best,particle_makespan,n_jobs,n_machines)
+    # number of operations
+    n_ops = n_jobs * n_machines
 
+    # stopping criteria: iterations number
+    for _ in range(iterations):
+        # makespan of each particle best position
+        particle_makespan = [evaluate_makespan(p,n_jobs,n_machines) for p in particle_best]
+        
+        # global best position
+        global_best = find_best(swarm,particle_best,particle_makespan,n_jobs,n_machines)
+        
+        for idx in range(swarm_size):
+            new_position = update_position(wc,wb,n_ops,swarm,particle_best,global_best,idx)
+            swarm[idx] = new_position
+    
+    return global_best
 
 def main():
-    file = "datasets//exemplo1.txt"
+    file = "datasets//ft06.txt"
     n_jobs, n_machines, operations = read_file(file)
 
-    swarm_size = 3
-    swarm = generate_swarm(swarm_size,n_jobs,n_machines,operations)
-
     # cognitive coefficients
-    wc = 0.2   # particle current position
-    wb = 0.3   # particle best position
-    wg = 0.5   # swarm best position
+    wc = 0.20   # particle current position
+    wb = 0.30   # particle best position
+    wg = 0.50   # swarm best position
     
-    execute(swarm,wc,wb,wg,n_jobs,n_machines)
+    values = []
+    for _ in range(10):
+        swarm_size = 100
+        swarm = generate_swarm(swarm_size,n_jobs,n_machines,operations)
+
+        iterations = 50
+        best_particle = execute(swarm,wc,wb,n_jobs,n_machines,iterations)
+        values.append(evaluate_makespan(best_particle,n_jobs,n_machines))
+    
+    print(min(values))
 
 main()
