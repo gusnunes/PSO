@@ -67,6 +67,35 @@ def generate_swarm(swarm_size, n_jobs, n_machines, operations):
     
     return swarm
 
+def mutation(swarm,idx_particle,pm):
+    particle_size = len(swarm[idx_particle])
+    
+    # how many mutations in particle operations
+    mutation_times = round(pm * particle_size)
+
+    for _ in range(mutation_times):
+        # select randomly a operation
+        idx_operation = random.randint(0,particle_size-1)
+        operation = swarm[idx_particle][idx_operation]
+        job = operation[0]
+        
+        # check the left border
+        left_border = -1
+        for op in range(idx_operation):
+            if job == swarm[idx_particle][op][0]:
+                left_border = op
+
+        # check the right border
+        for op in range(idx_operation+1, particle_size):
+            if job == swarm[idx_particle][op][0]:
+                right_border = op
+                break
+        else:
+            right_border = particle_size
+
+        new_index = random.randint(left_border+1, right_border-1)
+        swarm[idx_particle].insert(new_index, swarm[idx_particle].pop(idx_operation))
+
 # discovery particle and global best position
 def find_best(swarm,particle_best,particle_makespan,n_jobs,n_machines):
     min_makespan = float("inf")
@@ -123,6 +152,9 @@ def update_position(wc,wb,n,swarm,particle_best,global_best,idx):
 
 def execute(swarm,wc,wb,n_jobs,n_machines,iterations=100):
     swarm_size = len(swarm)
+
+    # particle mutation probability
+    pm = 0.70
     
     # the start position for each particle is the best position
     particle_best = copy.deepcopy(swarm)
@@ -141,11 +173,16 @@ def execute(swarm,wc,wb,n_jobs,n_machines,iterations=100):
         for idx in range(swarm_size):
             new_position = update_position(wc,wb,n_ops,swarm,particle_best,global_best,idx)
             swarm[idx] = new_position
+
+            # if particle is gonna mutate
+            u = round(random.random(),2)
+            if u <= pm:
+                mutation(swarm,idx,0.4)
     
     return global_best
 
 def main():
-    file = "datasets//ft06.txt"
+    file = "datasets//ft20.txt"
     n_jobs, n_machines, operations = read_file(file)
 
     # cognitive coefficients
@@ -155,7 +192,7 @@ def main():
     
     values = []
     for _ in range(10):
-        swarm_size = 100
+        swarm_size = 200
         swarm = generate_swarm(swarm_size,n_jobs,n_machines,operations)
 
         iterations = 50
